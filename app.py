@@ -57,7 +57,7 @@ async def process_frame(websocket, path=None):
 
 async def main():
     port = int(os.environ.get("PORT", 8765))
-    async with websockets.serve(process_frame, "", port):
+    async with websockets.serve(process_frame, "0.0.0.0", port):
         await asyncio.Future()  # Keeps the server running indefinitely
 
 if __name__ == '__main__':
