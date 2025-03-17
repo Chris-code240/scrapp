@@ -3,7 +3,7 @@ import websockets
 import cv2
 import numpy as np
 from imutils.perspective import four_point_transform
-
+import os
 
 
 WIDTH, HEIGHT = 1080,  1920
@@ -56,7 +56,8 @@ async def process_frame(websocket, path=None):
         await websocket.send(buffer.tobytes())
 
 async def main():
-    async with websockets.serve(process_frame, "Chris240.pythonanywhere.com"):
+    port = int(os.environ.get("PORT", 8765))
+    async with websockets.serve(process_frame, "", port):
         await asyncio.Future()  # Keeps the server running indefinitely
 
 if __name__ == '__main__':
