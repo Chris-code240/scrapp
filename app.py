@@ -1,11 +1,29 @@
-import asyncio
-import websockets
+import tkinter
 import cv2
 import numpy as np
 import json
+import customtkinter
 from imutils.perspective import four_point_transform
+from PIL import Image, ImageTk
+from pygrabber.dshow_graph import FilterGraph
+customtkinter.set_appearance_mode("dark")
+customtkinter.set_default_color_theme("blue")
 
-
+WIDTH = 720
+HEIGHT = 480
+camera_window_factor = 0.4
+app = customtkinter.CTk()
+app.geometry(f"{WIDTH}x{HEIGHT}")
+app.title("ScrApp")
+app.grid_columnconfigure(0, weight=1) 
+app.grid_columnconfigure(1, weight=2)
+def get_cameras()->dict:
+    devices = FilterGraph().get_input_devices()
+    cameras = {}
+    for device_index, name in enumerate(devices):
+        cameras[name] = device_index
+    return cameras
+    
 def scan_detection(image):
     """
     Detects contours (border-lines) in a frame and returns coordinates
@@ -40,44 +58,83 @@ def scan_detection(image):
     # cv2.drawContours(frame, [document_contour], -1, (0, 255, 0), 3)
     return cv2.drawContours(image_copy, [document_contour], -1, (0, 255, 0), 3),document_contour.reshape(4, 2)
 
+OPTIONS = ["Download Options","JSON", "Image", "PDF"]
+CAMERA_OPTIONS = get_cameras()
+camera_name = customtkinter.StringVar(value=list(CAMERA_OPTIONS.keys())[0])
+cap = cv2.VideoCapture(list(CAMERA_OPTIONS.values())[0])
+original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+desired_height = int(original_height * 0.7)
+desired_width = int(original_width * (desired_height / original_height))
+# desired_width = int(original_width * 0.5)
+# desired_width = int(desired_height/original_height)
 
-async def process_frame(websocket, path=None):
-        async for message in websocket:
-            try:
-                # Decode JSON message
-                data = json.loads(message)
+_,frame_read = cap.read()
+frame_rgb = cv2.cvtColor(frame_read, cv2.COLOR_BGR2RGB)
+frame_read = cv2.resize(frame_rgb, (desired_width, desired_height))
+captured_image = Image.fromarray(frame_read)
+window_frame = customtkinter.CTkImage(captured_image,size=(desired_width, desired_height))
 
-                # Check if "scrap" is in the data
-                if data["scrap"]:
+def set_camera_index(choice):
+    global camera_index
+    global cap
+    global cameraSourceComboBox
+    global camera_name
+    camera_index = CAMERA_OPTIONS[choice]
+    cap.release()
+    cap = cv2.VideoCapture(camera_index)
+    if not cap.read()[0]:
+        for cam in CAMERA_OPTIONS:
+            if cv2.VideoCapture(CAMERA_OPTIONS[cam])[0]:
+                cap = cv2.VideoCapture(CAMERA_OPTIONS[cam])
+                camera_index = CAMERA_OPTIONS[cam]
+                camera_name.set(cam)
+                cameraSourceComboBox.configure(value=cam)
+                cameraSourceComboBox.update()
+                break
+def open_camera():
+    global window_frame
+    global label
+    if cap is None:
+        print("Camera not initialized.")
+    else:
+        _, frame = cap.read()
+        if _:
+            # Convert the OpenCV frame to PIL Image
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            captured_image = Image.fromarray(frame)
+            window_frame = customtkinter.CTkImage(captured_image, size=(desired_width, desired_height))
+            label.configure(image=window_frame)
 
-                    await asyncio.sleep(0) # Debugging
-                    await websocket.send(json.dumps([]))
-                else:
-                    # Extract image bytes
-                    file_bytes = np.frombuffer(np.array(data["image"], dtype=np.uint8).tobytes(), np.uint8)
-                    frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-                    # Process frame
-                    frame, contour_coords = scan_detection(frame)
-                    warped = four_point_transform(frame, contour_coords)
-                    _, buffer = cv2.imencode('.jpg', warped, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+        label.after(10, open_camera)  # Keep updating the camera feed
 
-                    # Send processed image back
-                    await asyncio.sleep(0)
-                    await websocket.send(buffer.tobytes())
+cameraSourceComboBox = customtkinter.CTkComboBox(app, values=list(CAMERA_OPTIONS.keys()), variable=camera_name,command=set_camera_index)
+cameraSourceComboBox.grid(row=0, column=0, sticky="w", padx=10, pady=10)
+def set_download_option(choice):
+    global download_option
+    download_option = choice
 
-            except (json.JSONDecodeError, KeyError) as e:
-                print("Error decoding message:", e)
+# download options
+download_option = customtkinter.StringVar(value=OPTIONS[0])
+downloadOptionCombo = customtkinter.CTkComboBox(app, values=OPTIONS,variable=download_option,command=set_download_option )
+downloadOptionCombo.grid(row=0, column=1, sticky="e", padx=10, pady=10, columnspan=1)
 
+# Live feed
+label = customtkinter.CTkLabel(app,corner_radius=20,image=window_frame, bg_color="transparent", text="")
+label.grid(row=1, column=0,columnspan=1, sticky="ew", pady=10)
+open_camera()
 
+# capture button
 
-        # Send JSON response
-            # await websocket.send(cv2.imencode('.jpg', , [int(cv2.IMWRITE_JPEG_QUALITY), 95]))
+def captureCallback():
+    global capturedImageLabel
+    global window_frame
+    capturedImageLabel.configure(image=window_frame, text="")
+    capturedImageLabel.update()
+captureButton = customtkinter.CTkButton(app, text="Capture", command=captureCallback)
+captureButton.grid(row=2,column=0,padx=10, pady=10,columnspan=1, sticky="ew")
 
-async def main():
-    async with websockets.serve(process_frame, "localhost", 5000, ping_interval=60, ping_timeout=240):
-        await asyncio.Future()  # Keeps the server running indefinitely
-
-if __name__ == '__main__':
-    print("Websocket is running...")
-    asyncio.run(main())
-    # print(scan_detection(cv2.imread("../Document_scanner-main\scanned_0.jpg")))
+# Captured Image
+capturedImageLabel = customtkinter.CTkLabel(app, text="Nothing To See", width=desired_width, height=desired_height, bg_color="transparent")
+capturedImageLabel.grid(row=1, column=1,columnspan=1, sticky="ew", padx=10, pady=10)
+app.mainloop()

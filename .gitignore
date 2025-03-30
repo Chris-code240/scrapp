@@ -1,0 +1,14 @@
+.env
+backend.py
+classes.txt
+image.jpg
+IMG_5705.jpg
+IMG_5709.jpg
+processed_image.txt
+processed_image.xml
+scanner.html
+scanner.js
+script.py
+test_app.py
+utils.py
+index.html

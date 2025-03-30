@@ -1,4 +1,7 @@
-websockets
 opencv-python
 numpy
 imutils
+tkinter
+customktinter
+pygrabber
+PIL
