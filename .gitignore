@@ -11,3 +11,17 @@ scanner.js
 script.py
 test_app.py
 index.html
+*.json
+*.xml
+1.txt
+5_back.txt
+5_back.*
+*.zip
+dataset_new_
+temp
+tess*
+script*
+Note*
+test*
+data*
+__pycache__
